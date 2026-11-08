@@ -34,7 +34,7 @@
 - Keep the Hatchable application online until migration and tests are completed.
 - Free plans have quotas and may pause inactive projects. No uptime, unlimited storage, email delivery or OCR accuracy guarantee is implied.
 
-## Known incomplete items in this initial migration foundation
+## Current migration status\n- A separate `free-hosting-migration` branch exists; the original `main` branch and live Hatchable app remain untouched.\n- Supabase SQL schema and private buckets are prepared.\n- Supabase Edge Function and email OTP browser wiring are scaffolded.\n- The API is not yet feature-complete: team invitations/role administration, proof list joins, full dashboard aggregates, complete monthly reports, and some scan/document edge cases still need implementation and testing.\n- No Supabase project has been provisioned and no app has been deployed.\n- No production financial records have been copied.\n\n## Known incomplete items in this initial migration foundation
 - Frontend auth wiring and final deployment config are still required.
 - The full API route parity (especially invitations, proof upload, OCR metadata, and document filters) must be completed and tested before production use.
 - This is not a live replacement yet. No production financial records have been migrated.
