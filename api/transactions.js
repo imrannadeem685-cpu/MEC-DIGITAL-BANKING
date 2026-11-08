@@ -5,7 +5,13 @@ export const access = "user";
 export const methods = ["GET", "POST", "PUT"];
 
 export default async function (req, res) {
-  const permission = req.method === "GET" ? "transaction_view" : req.method === "POST" ? "transaction_create" : "transaction_edit";
+  const permission = req.method === "GET"
+    ? "transaction_view"
+    : req.method === "POST"
+      ? "transaction_create"
+      : req.body?.action === "void"
+        ? "transaction_void"
+        : "transaction_edit";
   const profile = await requirePermission(req, res, permission);
   if (!profile) return;
 
