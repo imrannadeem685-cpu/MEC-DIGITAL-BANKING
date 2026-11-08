@@ -56,64 +56,39 @@ button.secondary{background:white;border:1px solid #e0e4ea;color:#536077}
 <p id="message" class="msg" role="status" aria-live="polite"></p>
 <div class="foot">One Vision. Multi-Business. Global Success.<br>© MEC · Mughal Era Creation</div>
 </main>
+<script src="/mec-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
-  const A=window.hatchable&&window.hatchable.auth;
-  const $=id=>document.getElementById(id);
-  let step="email",hasPasskey=false;
-  const DECLINED="mec_passkey_offer_declined";
-  function say(s,err){$("message").textContent=s||"";$("message").className="msg"+(err?" err":"");}
-  function safeNext(){
-    const raw=new URLSearchParams(location.search).get("next")||"/";
-    if(!raw.startsWith("/")||raw.startsWith("//"))return "/";
-    for(let i=0;i<raw.length;i++){const c=raw.charCodeAt(i);if(c<32||c===92||c===127)return "/";}
-    return raw;
-  }
-  function done(){location.replace(safeNext());}
-  function decline(){try{localStorage.setItem(DECLINED,"1");}catch{}done();}
-  function showPasskeyOffer(){
-    if(hasPasskey||!A.supportsPasskeys||!A.supportsPasskeys()||localStorage.getItem(DECLINED)==="1"){done();return;}
-    step="passkey";$("loginForm").hidden=true;$("title").textContent="Secure this device";
-    $("subtitle").textContent="Your MEC sign-in is complete.";
-    $("passkeyPanel").hidden=false;
-    $("message").textContent="";
-  }
-  if(!A){say("Sign-in is unavailable. Refresh and try again.",true);$("continueBtn").disabled=true;return;}
-  A.getSession().then(s=>{if(s&&s.user)done();}).catch(()=>{});
-  if(A.attachPasskeyAutofill){
-    A.attachPasskeyAutofill($("email")).then(r=>{if(r&&r.user)done();}).catch(()=>{});
-  }
-  $("loginForm").addEventListener("submit",async e=>{
-    e.preventDefault();const btn=$("continueBtn");btn.disabled=true;say("");
-    try{
-      if(step==="email"){
-        const email=$("email").value.trim();if(!email)throw new Error("Enter your email address.");
-        const r=await A.startLogin({email});hasPasskey=!!(r&&r.has_passkey);
-        if(hasPasskey&&A.supportsPasskeys&&A.supportsPasskeys()){
-          try{const d=await A.signInWithPasskey({email});if(d&&d.user){done();return;}}catch{}
-        }
-        step="code";$("emailPanel").hidden=true;$("codePanel").hidden=false;
-        $("backBtn").hidden=false;btn.textContent="Verify and sign in";
-        $("subtitle").textContent="Enter the one-time code sent to "+email+".";
-        $("code").focus();say("Verification code sent. Check your inbox.");
-      }else if(step==="code"){
-        const d=await A.verifyCode({email:$("email").value.trim(),code:$("code").value.trim()});
-        if(!d||!d.user)throw new Error("The code could not be verified.");
-        showPasskeyOffer();
-      }
-    }catch(err){say(err.message||"Could not sign in. Please try again.",true);}
-    finally{btn.disabled=false;}
-  });
-  $("backBtn").addEventListener("click",()=>{
-    step="email";$("emailPanel").hidden=false;$("codePanel").hidden=true;$("backBtn").hidden=true;
-    $("continueBtn").textContent="Continue securely";$("subtitle").textContent="Sign in with your email. We’ll send you a one-time verification code. No password needed.";say("");
-  });
-  $("addPasskey").addEventListener("click",async()=>{
-    $("addPasskey").disabled=true;$("skipPasskey").disabled=true;
-    try{const saved=await A.registerPasskey();if(!saved)decline();else done();}
-    catch(err){say(err.message||"Could not add a passkey. You can continue without one.",true);$("addPasskey").disabled=false;$("skipPasskey").disabled=false;}
-  });
-  $("skipPasskey").addEventListener("click",decline);
+ const cfg=window.MEC_CONFIG||{};
+ const client=window.supabase?.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);
+ const $=id=>document.getElementById(id);
+ let step="email";
+ function say(s,err){$("message").textContent=s||"";$("message").className="msg"+(err?" err":"");}
+ function safeNext(){const raw=new URLSearchParams(location.search).get("next")||"/";return raw.startsWith("/")&&!raw.startsWith("//")?raw:"/";}
+ if(!client||!cfg.SUPABASE_URL||cfg.SUPABASE_URL.includes("YOUR-PROJECT-REF")||!cfg.SUPABASE_ANON_KEY||cfg.SUPABASE_ANON_KEY.startsWith("YOUR_")){
+   say("Migration setup is incomplete. Configure public/mec-config.js first.",true);$("continueBtn").disabled=true;return;
+ }
+ client.auth.getSession().then(({data})=>{if(data.session)location.replace(safeNext());});
+ $("loginForm").addEventListener("submit",async e=>{
+  e.preventDefault();const btn=$("continueBtn");btn.disabled=true;say("");
+  try{
+   const email=$("email").value.trim();
+   if(step==="email"){
+    if(!email)throw new Error("Enter your email address.");
+    const {error}=await client.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+"/login"}});
+    if(error)throw error;
+    step="code";$("emailPanel").hidden=true;$("codePanel").hidden=false;$("backBtn").hidden=false;
+    btn.textContent="Verify and sign in";$("subtitle").textContent="Enter the verification code sent to "+email+".";say("Verification code sent. Check your inbox.");$("code").focus();
+   }else{
+    const {data,error}=await client.auth.verifyOtp({email,token:$("code").value.trim(),type:"email"});
+    if(error)throw error;if(!data.session)throw new Error("Could not verify the code.");
+    location.replace(safeNext());
+   }
+  }catch(err){say(err.message||"Could not sign in. Please try again.",true);}
+  finally{btn.disabled=false;}
+ });
+ $("backBtn").addEventListener("click",()=>{step="email";$("emailPanel").hidden=false;$("codePanel").hidden=true;$("backBtn").hidden=true;$("continueBtn").textContent="Continue securely";$("subtitle").textContent="Sign in with your email. We’ll send you a one-time verification code. No password needed.";say("");});
 })();
 </script>
 </body>

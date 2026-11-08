@@ -42,7 +42,10 @@
     toast._timer = setTimeout(() => { el.className = "toast"; }, 3400);
   }
   async function api(path, options={}) {
-    const res = await fetch("/api/" + path, { credentials:"same-origin", ...options });
+    const session = await window.MEC_AUTH.getSession();
+    if(!session?.access_token) throw new Error("Please sign in again.");
+    const base = window.MEC_CONFIG.API_URL.replace(/\\/$/, "");
+    const res = await fetch(base + "/" + path, { credentials:"omit", ...options, headers:{ ...(options.headers||{}), Authorization:"Bearer "+session.access_token } });
     if (!res.ok) {
       let body = {};
       try { body = await res.json(); } catch {}
@@ -647,13 +650,13 @@
     $("transactionDate").value=today(); $("accountOpeningDate").value=today();
     $("reportFrom").value=new Date(new Date().getFullYear(),0,1).toISOString().slice(0,10); $("reportTo").value=today();
     try {
-      const session=await window.hatchable.auth.getSession();
+      const session=await window.MEC_AUTH.getSession();
       if(!session?.user){location.replace("/login?next=/");return;}
       const data=await api("bootstrap");
       state.profile=data.profile;state.workspace=data.workspace;
       if(data.profile.status!=="active"){
         $("appLoading").hidden=true;$("pendingScreen").hidden=false;
-        $("pendingSignOut").addEventListener("click",async()=>{await window.hatchable.auth.signOut();location.replace("/login");});
+        $("pendingSignOut").addEventListener("click",async()=>{await window.MEC_AUTH.signOut();location.replace("/login");});
         return;
       }
       $("userName").textContent=data.profile.full_name||data.profile.email||"MEC User";
