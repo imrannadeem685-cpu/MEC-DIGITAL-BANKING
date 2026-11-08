@@ -1,0 +1,25 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials/
+config/secrets.*
+
+# Local/private financial data
+uploads/
+storage/
+backups/
+exports/
+*.sql.gz
+*.dump
+*.bak
+*.log
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
