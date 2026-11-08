@@ -1,0 +1,4 @@
+project_id = "mec-digital-banking"
+
+[functions.mec-api]
+verify_jwt = false

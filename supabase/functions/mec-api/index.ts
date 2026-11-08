@@ -1,0 +1,99 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const cors = {
+  "Access-Control-Allow-Origin": Deno.env.get("MEC_ALLOWED_ORIGIN") || "*",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+};
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+  status, headers: { ...cors, "Content-Type": "application/json; charset=utf-8" },
+});
+const fail = (message: string, status = 400) => json({ error: message }, status);
+const defaults: Record<string,string[]> = {
+  owner:["*"],
+  accountant:["dashboard_view","transaction_view","transaction_create","transaction_edit","transaction_void","account_view","account_manage","business_view","business_manage","report_view","proof_upload","proof_view","export_view","team_view"],
+  cashier:["dashboard_view","transaction_view","transaction_create","account_view","business_view","proof_upload","proof_view"],
+  staff:["dashboard_view","transaction_view","account_view","business_view","proof_view"],
+  viewer:["dashboard_view","transaction_view","account_view","business_view","report_view","proof_view"],
+};
+const env = (key:string) => Deno.env.get(key) || "";
+const sbUrl=env("SUPABASE_URL"), anon=env("SUPABASE_ANON_KEY"), service=env("SUPABASE_SERVICE_ROLE_KEY");
+if(!sbUrl||!anon||!service) console.error("Missing Supabase secrets: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY");
+const admin = createClient(sbUrl,service,{auth:{persistSession:false,autoRefreshToken:false}});
+const userClient = (token:string) => createClient(sbUrl,anon,{auth:{persistSession:false,autoRefreshToken:false},global:{headers:{Authorization:"Bearer "+token}}});
+const str=(v:unknown,n=240)=>String(v??"").trim().slice(0,n);
+const num=(v:unknown)=>{const x=Number(v);return Number.isFinite(x)?x:NaN;};
+const amount=(v:unknown)=>{if(v===null||v===undefined||v==="")return null;const x=Number(String(v).replace(/,/g,""));return Number.isFinite(x)&&x>=0?Math.round(x*100)/100:null;};
+const validDate=(v:unknown)=>/^\d{4}-\d{2}-\d{2}$/.test(str(v,10))?str(v,10):null;
+
+async function auth(req:Request){
+ const token=(req.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
+ if(!token) throw new Error("UNAUTHENTICATED");
+ const u=userClient(token);
+ const {data,error}=await u.auth.getUser(token);
+ if(error||!data.user) throw new Error("UNAUTHENTICATED");
+ let {data:profile,error:pe}=await admin.from("user_profiles").select("*").eq("user_id",data.user.id).maybeSingle();
+ let {data:state,error:se}=await admin.from("workspace_state").select("workspace_id,owner_user_id").eq("id",1).maybeSingle();
+ if(se) throw new Error("DATABASE_NOT_READY");
+ if(!state){
+   const {data:ws,error:we}=await admin.from("workspaces").insert({name:"MEC Digital Banking System",currency:"PKR"}).select().single();
+   if(we) throw we;
+   const {error:stErr}=await admin.from("workspace_state").insert({id:1,workspace_id:ws.id,owner_user_id:data.user.id});
+   if(stErr) throw stErr;
+   const fullName=str(data.user.user_metadata?.full_name||data.user.email?.split("@")[0],120);
+   const {data:p,error:prErr}=await admin.from("user_profiles").insert({user_id:data.user.id,workspace_id:ws.id,email:data.user.email,full_name:fullName,role:"owner",status:"active"}).select().single();
+   if(prErr) throw prErr;
+   profile=p; state={workspace_id:ws.id,owner_user_id:data.user.id};
+ } else if(!profile){
+   const fullName=str(data.user.user_metadata?.full_name||data.user.email?.split("@")[0],120);
+   const {data:p,error:prErr}=await admin.from("user_profiles").insert({user_id:data.user.id,workspace_id:state.workspace_id,email:data.user.email,full_name:fullName,role:"staff",status:"pending"}).select().single();
+   if(prErr) throw prErr; profile=p;
+ }
+ if(!profile) throw new Error("PROFILE_NOT_FOUND");
+ return {user:data.user,profile,state,client:u};
+}
+function can(p:any,permission:string){if(p.status!=="active")return false;if(p.role==="owner")return true;if(Object.hasOwn(p.permissions||{},permission))return p.permissions[permission]===true;const list=defaults[p.role]||[];return list.includes("*")||list.includes(permission);}
+function requireP(p:any,permission:string){if(p.status!=="active")throw new Error("PENDING_APPROVAL");if(!can(p,permission))throw new Error("FORBIDDEN");}
+async function audit(p:any,action:string,type:string,id:string,details:unknown={}){await admin.from("audit_logs").insert({workspace_id:p.workspace_id,actor_user_id:p.user_id,action,entity_type:type,entity_id:id,details});}
+async function body(req:Request){const ct=req.headers.get("content-type")||"";if(ct.includes("application/json"))return await req.json().catch(()=>({}));return {};}
+async function handler(req:Request){
+ if(req.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
+ if(!sbUrl||!anon||!service)return fail("Supabase backend secrets are not configured.",503);
+ let ctx:any;try{ctx=await auth(req);}catch(e){const m=String((e as Error).message||e);return fail(m==="UNAUTHENTICATED"?"Please sign in again.":m==="PENDING_APPROVAL"?"Your access is pending owner approval.":m, m==="UNAUTHENTICATED"?401:m==="FORBIDDEN"?403:500);}
+ const p=ctx.profile, ws=p.workspace_id, u=new URL(req.url), path=u.pathname.split("/").filter(Boolean).slice(1).join("/");
+ try{
+  if(path==="bootstrap"&&req.method==="GET"){
+   if(p.status!=="active")return json({profile:p,workspace:null},403);
+   const {data:workspace}=await admin.from("workspaces").select("*").eq("id",ws).single();
+   return json({profile:p,workspace});
+  }
+  if(path==="accounts"){
+   if(req.method==="GET"){requireP(p,"account_view");const {data,error}=await admin.from("finance_accounts").select("*,businesses(name)").eq("workspace_id",ws).order("name");if(error)throw error;const {data:tx}=await admin.from("transactions").select("transaction_type,amount,from_account_id,to_account_id,status").eq("workspace_id",ws).eq("status","posted");const rows=(data||[]).map((a:any)=>({...a,business_name:a.businesses?.name||"",current_balance:Number(a.opening_balance)+((tx||[]).reduce((s:any,t:any)=>s+(t.to_account_id===a.id?(t.transaction_type==="income"||t.transaction_type==="transfer"?Number(t.amount):0):0)-(t.from_account_id===a.id?(t.transaction_type==="expense"||t.transaction_type==="transfer"?Number(t.amount):0):0),0))}));return json({accounts:rows});}
+   const b=await body(req);requireP(p,"account_manage");
+   if(req.method==="POST"){const name=str(b.name,120),type=b.account_type,scope=b.scope||"personal",opening=num(b.opening_balance||0);if(!name||!["bank","wallet"].includes(type)||!["personal","business","shared"].includes(scope)||!Number.isFinite(opening))return fail("Enter valid account details.");if(scope==="business"&&!b.business_id)return fail("Choose a business.");const {data,error}=await admin.from("finance_accounts").insert({workspace_id:ws,name,institution:str(b.institution,120),account_type:type,account_number_hint:str(b.account_number_hint,12),scope,business_id:scope==="business"?b.business_id:null,currency:"PKR",opening_balance:opening,opening_date:validDate(b.opening_date)||new Date().toISOString().slice(0,10),notes:str(b.notes,1000),created_by:p.user_id}).select().single();if(error)throw error;await audit(p,"account_created","account",data.id,{name});return json({account:data},201);}
+   if(req.method==="PUT"){const {data,error}=await admin.from("finance_accounts").update({name:b.name?str(b.name,120):undefined,institution:b.institution!==undefined?str(b.institution,120):undefined,notes:b.notes!==undefined?str(b.notes,1000):undefined,active:typeof b.active==="boolean"?b.active:undefined}).eq("id",b.id).eq("workspace_id",ws).select().single();if(error)throw error;await audit(p,"account_updated","account",data.id,{active:data.active});return json({account:data});}
+  }
+  if(path==="businesses"){
+   if(req.method==="GET"){requireP(p,"business_view");const {data,error}=await admin.from("businesses").select("*").eq("workspace_id",ws).order("name");if(error)throw error;return json({businesses:data});}
+   requireP(p,"business_manage");const b=await body(req);
+   if(req.method==="POST"){const name=str(b.name,150);if(!name)return fail("Business name is required.");const {data,error}=await admin.from("businesses").insert({workspace_id:ws,name,notes:str(b.notes,1000),created_by:p.user_id}).select().single();if(error)throw error;await audit(p,"business_created","business",data.id,{name});return json({business:data},201);}
+   if(req.method==="PUT"){const {data,error}=await admin.from("businesses").update({name:b.name?str(b.name,150):undefined,notes:b.notes!==undefined?str(b.notes,1000):undefined,active:typeof b.active==="boolean"?b.active:undefined}).eq("id",b.id).eq("workspace_id",ws).select().single();if(error)throw error;await audit(p,"business_updated","business",data.id,{active:data.active});return json({business:data});}
+  }
+  if(path==="transactions"){
+   if(req.method==="GET"){requireP(p,"transaction_view");let q=admin.from("transactions").select("*,from_account:finance_accounts!transactions_from_account_id_fkey(name),to_account:finance_accounts!transactions_to_account_id_fkey(name)").eq("workspace_id",ws).order("transaction_date",{ascending:false}).limit(Math.min(500,Math.max(1,Number(u.searchParams.get("limit"))||150)));const from=u.searchParams.get("from"),to=u.searchParams.get("to"),type=u.searchParams.get("type"),scope=u.searchParams.get("scope"),term=u.searchParams.get("q");if(from)q=q.gte("transaction_date",from);if(to)q=q.lte("transaction_date",to);if(["income","expense","transfer"].includes(type||""))q=q.eq("transaction_type",type);if(["personal","business"].includes(scope||""))q=q.eq("scope",scope);if(term)q=q.or(["description","counterparty","reference","category","sender_name","receiver_name","provider_name","bill_number","invoice_number"].map(k=>k+".ilike.%"+term.replace(/[,%()]/g,"")+"%").join(","));const {data,error}=await q;if(error)throw error;return json({transactions:(data||[]).map((t:any)=>({...t,from_account_name:t.from_account?.name||"",to_account_name:t.to_account?.name||""}))});}
+   const b=await body(req);
+   if(req.method==="POST"){requireP(p,"transaction_create");const type=b.transaction_type,scope=b.scope||"personal",amountValue=num(b.amount),from=b.from_account_id||null,to=b.to_account_id||null;if(!["income","expense","transfer"].includes(type)||!["personal","business"].includes(scope)||!Number.isFinite(amountValue)||amountValue<=0)return fail("Enter valid transaction details.");if((type==="income"&&(!to||from))||(type==="expense"&&(!from||to))||(type==="transfer"&&(!from||!to||from===to)))return fail("Select the correct source and destination accounts.");if(scope==="business"&&!b.business_id)return fail("Choose a business.");const {data,error}=await admin.from("transactions").insert({workspace_id:ws,transaction_type:type,scope,business_id:scope==="business"?b.business_id:null,amount:amountValue,from_account_id:from,to_account_id:to,category:str(b.category||"General",80),counterparty:str(b.counterparty,120),reference:str(b.reference,120),description:str(b.description,1000),transaction_date:validDate(b.transaction_date)||new Date().toISOString().slice(0,10),created_by:p.user_id,updated_by:p.user_id,sender_name:str(b.sender_name,160),sender_account_hint:str(b.sender_account_hint,40),receiver_name:str(b.receiver_name,160),receiver_account_hint:str(b.receiver_account_hint,40),provider_name:str(b.provider_name,100),transaction_time:str(b.transaction_time,8),fee_amount:amount(b.fee_amount)||0,tax_amount:amount(b.tax_amount)||0,bill_number:str(b.bill_number,120),invoice_number:str(b.invoice_number,120),payment_status:str(b.payment_status,30),scan_data:b.scan_data||{},ocr_text:str(b.ocr_text,30000)}).select().single();if(error)throw error;await audit(p,"transaction_created","transaction",data.id,{type,amount:amountValue,scope});return json({transaction:data},201);}
+   if(req.method==="PUT"){requireP(p,"transaction_edit");if(b.action==="void")requireP(p,"transaction_void");const {data:old,error:oe}=await admin.from("transactions").select("*").eq("id",b.id).eq("workspace_id",ws).single();if(oe)throw oe;if(b.action==="void"){if(!str(b.reason,500))return fail("A reason is required.");const {data,error}=await admin.from("transactions").update({status:"voided",void_reason:str(b.reason,500),updated_by:p.user_id,updated_at:new Date().toISOString()}).eq("id",b.id).eq("workspace_id",ws).select().single();if(error)throw error;await audit(p,"transaction_voided","transaction",b.id,{reason:str(b.reason,500)});return json({transaction:data});}const patch:any={updated_by:p.user_id,updated_at:new Date().toISOString()};for(const k of ["amount","category","counterparty","reference","description","transaction_date","sender_name","sender_account_hint","receiver_name","receiver_account_hint","provider_name","transaction_time","fee_amount","tax_amount","bill_number","invoice_number","payment_status","scan_data","ocr_text"])if(b[k]!==undefined)patch[k]=b[k];if(patch.amount!==undefined&&(!Number.isFinite(num(patch.amount))||num(patch.amount)<=0))return fail("Amount must be greater than zero.");const {data,error}=await admin.from("transactions").update(patch).eq("id",b.id).eq("workspace_id",ws).select().single();if(error)throw error;await audit(p,"transaction_updated","transaction",b.id,{before:old,after:data});return json({transaction:data});}
+  }
+  if(path==="dashboard"&&req.method==="GET"){requireP(p,"dashboard_view");const {data:tx,error}=await admin.from("transactions").select("transaction_type,amount,transaction_date,status").eq("workspace_id",ws).eq("status","posted");if(error)throw error;const all=tx||[],income=all.filter((t:any)=>t.transaction_type==="income").reduce((s:number,t:any)=>s+Number(t.amount),0),expense=all.filter((t:any)=>t.transaction_type==="expense").reduce((s:number,t:any)=>s+Number(t.amount),0);const now=new Date(),monthStart=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);const mt=all.filter((t:any)=>t.transaction_date>=monthStart),mi=mt.filter((t:any)=>t.transaction_type==="income").reduce((s:number,t:any)=>s+Number(t.amount),0),me=mt.filter((t:any)=>t.transaction_type==="expense").reduce((s:number,t:any)=>s+Number(t.amount),0);return json({summary:{total_income:income,total_expense:expense,net_cashflow:income-expense,transaction_count:all.length},month:{income:mi,expense:me,count:mt.length},assets:{total_balance:0},recent:[],monthly:[]});}
+  if(path==="reports"&&req.method==="GET"){requireP(p,"report_view");const from=u.searchParams.get("from")||"2000-01-01",to=u.searchParams.get("to")||new Date().toISOString().slice(0,10);const {data,error}=await admin.from("transactions").select("transaction_type,amount,category,transaction_date").eq("workspace_id",ws).eq("status","posted").gte("transaction_date",from).lte("transaction_date",to);if(error)throw error;const rows=data||[],inc=rows.filter((t:any)=>t.transaction_type==="income").reduce((s:number,t:any)=>s+Number(t.amount),0),exp=rows.filter((t:any)=>t.transaction_type==="expense").reduce((s:number,t:any)=>s+Number(t.amount),0);const cats:any={};for(const t of rows){const k=t.category+"|"+t.transaction_type;cats[k]??={category:t.category,transaction_type:t.transaction_type,amount:0,count:0};cats[k].amount+=Number(t.amount);cats[k].count++;}return json({from,to,totals:{income:inc,expense:exp,net:inc-exp,transactions:rows.length},categories:Object.values(cats),monthly:[]});}
+  if(path==="audit"&&req.method==="GET"){requireP(p,"audit_view");const {data,error}=await admin.from("audit_logs").select("*").eq("workspace_id",ws).order("created_at",{ascending:false}).limit(200);if(error)throw error;return json({logs:data});}
+  if(path==="documents"&&req.method==="GET"){requireP(p,"proof_view");const {data,error}=await admin.from("financial_documents").select("*").eq("workspace_id",ws).order("created_at",{ascending:false}).limit(300);if(error)throw error;return json({documents:data});}
+  if(path==="documents"&&req.method==="POST"){requireP(p,"proof_upload");const form=await req.formData(),file=form.get("file"),metaRaw=form.get("metadata");if(!(file instanceof File))return fail("Attach the original document.");if(file.size>5*1024*1024)return fail("File exceeds 5 MB.",413);if(!["image/jpeg","image/png","image/webp","application/pdf"].includes(file.type))return fail("Only JPG, PNG, WebP and PDF are supported.",415);let meta:any={};try{meta=JSON.parse(String(metaRaw||"{}"));}catch{return fail("Invalid document metadata.");}const key=ws+"/"+crypto.randomUUID()+"-"+str(file.name,150);const {error:upErr}=await admin.storage.from("mec-documents").upload(key,file,{contentType:file.type,upsert:false});if(upErr)throw upErr;const {data,error}=await admin.from("financial_documents").insert({workspace_id:ws,document_type:str(meta.document_type||"other",60),title:str(meta.title||file.name,200),document_date:validDate(meta.transaction_date),due_date:validDate(meta.due_date),party_name:str(meta.merchant_or_biller||meta.receiver_name||meta.sender_name,180),reference_number:str(meta.transaction_reference||meta.bill_number||meta.invoice_number,120),amount:amount(meta.transaction_amount),paid_amount:amount(meta.transaction_amount),balance_due:amount(meta.balance_due),payment_status:str(meta.payment_status||"unknown",30),provider_name:str(meta.provider_name,100),currency:"PKR",extracted_data:meta,ocr_text:str(meta.full_text,30000),storage_key:key,original_filename:str(file.name,200),content_type:file.type,byte_size:file.size,uploaded_by:p.user_id}).select().single();if(error){await admin.storage.from("mec-documents").remove([key]);throw error;}await audit(p,"financial_document_saved","financial_document",data.id,{title:data.title});return json({document:data},201);}
+  if(path.startsWith("documents/")||path.startsWith("proofs/")){requireP(p,"proof_view");const isDoc=path.startsWith("documents/"),id=path.split("/")[1],table=isDoc?"financial_documents":"transaction_proofs",bucket=isDoc?"mec-documents":"mec-proofs";const {data,error}=await admin.from(table).select("storage_key").eq("id",id).eq("workspace_id",ws).single();if(error||!data)return fail("Document not found.",404);const {data:signed,error:se}=await admin.storage.from(bucket).createSignedUrl(data.storage_key,60);if(se)throw se;return Response.redirect(signed.signedUrl,302);}
+  if(path==="export"&&req.method==="GET"){requireP(p,"export_view");const {data,error}=await admin.from("transactions").select("*").eq("workspace_id",ws).order("transaction_date",{ascending:false}).limit(5000);if(error)throw error;const cols=["id","transaction_date","transaction_type","scope","category","amount","counterparty","reference","description","status"];const cell=(v:any)=>{let s=String(v??"");if(/^[=+@\-\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};const csv="\uFEFF"+[cols.join(","),...(data||[]).map((x:any)=>cols.map(k=>cell(x[k])).join(","))].join("\r\n");return new Response(csv,{headers:{...cors,"Content-Type":"text/csv; charset=utf-8","Content-Disposition":"attachment; filename=mec-transactions.csv"}});}
+  if(path==="team"&&req.method==="GET"){requireP(p,"team_view");const {data,error}=await admin.from("user_profiles").select("user_id,email,full_name,role,permissions,status,created_at").eq("workspace_id",ws).order("created_at");if(error)throw error;return json({members:data});}
+  return fail("Endpoint not implemented in this migration build: "+path,501);
+ }catch(e){console.error("MEC API error",e);return fail((e as Error).message||"Server error",500);}
+}
+Deno.serve(handler);
