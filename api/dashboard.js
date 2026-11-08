@@ -53,7 +53,7 @@ export default async function (req, res) {
        FROM transactions t
        LEFT JOIN finance_accounts fa ON fa.id = t.from_account_id
        LEFT JOIN finance_accounts ta ON ta.id = t.to_account_id
-      WHERE t.workspace_id = $1
+      WHERE t.workspace_id = $1 AND t.status = 'posted'
       ORDER BY t.transaction_date DESC, t.created_at DESC LIMIT 8`,
     [profile.workspace_id]
   )).rows;
