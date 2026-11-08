@@ -23,6 +23,10 @@ button:disabled{opacity:.55;cursor:wait}
 button.secondary{background:white;border:1px solid #e0e4ea;color:#536077}
 .msg{min-height:20px;margin:12px 0 0;text-align:center;color:#758195;font-size:11px;line-height:1.5}
 .msg.err{color:#b84e4e}
+.auth-switch{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;margin:16px 0 20px;background:#f1f4f8;border-radius:10px}
+.auth-switch button{height:38px;margin:0;background:transparent;color:#64748b;border:1px solid transparent}
+.auth-switch button.active{background:#0b1830;color:#fff;box-shadow:0 3px 10px #0b183022}
+.auth-note{font-size:10px;line-height:1.6;color:#7d899a;text-align:center;margin:-8px 0 16px}
 .foot{text-align:center;border-top:1px solid #edf0f4;padding-top:16px;margin-top:22px;color:#9aa3b0;font-size:9px}
 [hidden]{display:none!important}
 </style>
@@ -33,6 +37,11 @@ button.secondary{background:white;border:1px solid #e0e4ea;color:#536077}
 <div class="brandname">MUGHAL ERA CREATION</div>
 <h1 id="title">MEC Finance Workspace</h1>
 <p class="sub" id="subtitle">Sign in with your email. We’ll send you a one-time verification code. No password needed.</p>
+<div class="auth-switch" role="group" aria-label="Account access">
+  <button id="signinTab" type="button" class="active" aria-pressed="true">Sign in</button>
+  <button id="signupTab" type="button" aria-pressed="false">Sign up</button>
+</div>
+<p class="auth-note" id="authNote">Secure email verification. No password needed.</p>
 
 <form id="loginForm">
   <div id="emailPanel">
@@ -61,6 +70,7 @@ button.secondary{background:white;border:1px solid #e0e4ea;color:#536077}
   const A=window.hatchable&&window.hatchable.auth;
   const $=id=>document.getElementById(id);
   let step="email",hasPasskey=false;
+  let mode=new URLSearchParams(location.search).get("mode")==="signup"?"signup":"signin";
   const DECLINED="mec_passkey_offer_declined";
   function say(s,err){$("message").textContent=s||"";$("message").className="msg"+(err?" err":"");}
   function safeNext(){
@@ -70,6 +80,27 @@ button.secondary{background:white;border:1px solid #e0e4ea;color:#536077}
     return raw;
   }
   function done(){location.replace(safeNext());}
+  function setMode(next){
+    if(next!=="signin"&&next!=="signup")return;
+    if(step!=="email"){
+      step="email";$("emailPanel").hidden=false;$("codePanel").hidden=true;
+      $("backBtn").hidden=true;$("code").value="";$("continueBtn").textContent="Continue securely";
+    }
+    mode=next;
+    const signingUp=mode==="signup";
+    $("signinTab").classList.toggle("active",!signingUp);
+    $("signupTab").classList.toggle("active",signingUp);
+    $("signinTab").setAttribute("aria-pressed",String(!signingUp));
+    $("signupTab").setAttribute("aria-pressed",String(signingUp));
+    $("title").textContent=signingUp?"Create your MEC account":"MEC Finance Workspace";
+    $("subtitle").textContent=signingUp
+      ?"Register with your email. We’ll send a one-time verification code; new accounts require owner approval before using the workspace."
+      :"Sign in with your email. We’ll send you a one-time verification code. No password needed.";
+    $("authNote").textContent=signingUp
+      ?"New registrations are reviewed by the workspace owner."
+      :"Secure email verification. No password needed.";
+    say("");
+  }
   function decline(){try{localStorage.setItem(DECLINED,"1");}catch{}done();}
   function showPasskeyOffer(){
     if(hasPasskey||!A.supportsPasskeys||!A.supportsPasskeys()||localStorage.getItem(DECLINED)==="1"){done();return;}
@@ -78,6 +109,9 @@ button.secondary{background:white;border:1px solid #e0e4ea;color:#536077}
     $("passkeyPanel").hidden=false;
     $("message").textContent="";
   }
+  setMode(mode);
+  $("signinTab").addEventListener("click",()=>setMode("signin"));
+  $("signupTab").addEventListener("click",()=>setMode("signup"));
   if(!A){say("Sign-in is unavailable. Refresh and try again.",true);$("continueBtn").disabled=true;return;}
   A.getSession().then(s=>{if(s&&s.user)done();}).catch(()=>{});
   if(A.attachPasskeyAutofill){
@@ -106,7 +140,7 @@ button.secondary{background:white;border:1px solid #e0e4ea;color:#536077}
   });
   $("backBtn").addEventListener("click",()=>{
     step="email";$("emailPanel").hidden=false;$("codePanel").hidden=true;$("backBtn").hidden=true;
-    $("continueBtn").textContent="Continue securely";$("subtitle").textContent="Sign in with your email. We’ll send you a one-time verification code. No password needed.";say("");
+    $("continueBtn").textContent="Continue securely";setMode(mode);say("");
   });
   $("addPasskey").addEventListener("click",async()=>{
     $("addPasskey").disabled=true;$("skipPasskey").disabled=true;
