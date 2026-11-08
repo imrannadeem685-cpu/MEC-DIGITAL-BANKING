@@ -694,7 +694,7 @@
   $("exportTransactions").addEventListener("click",exportCSV);$("reportExport").addEventListener("click",exportCSV);
   $("runReport").addEventListener("click",loadReports);
   $("languageSwitch").addEventListener("click",()=>{state.lang=state.lang==="en"?"ur":"en";applyLanguage();});
-  $("signOut").addEventListener("click",async()=>{await window.hatchable.auth.signOut();location.replace("/login");});
+  $("signOut").addEventListener("click",async()=>{await window.MEC_AUTH.signOut();location.replace("/login");});
   $("mobileMenu").addEventListener("click",()=>{$("sidebar").classList.add("open");$("mobileScrim").classList.add("show");});
   $("mobileScrim").addEventListener("click",()=>{$("sidebar").classList.remove("open");$("mobileScrim").classList.remove("show");});
   document.querySelectorAll("[data-close]").forEach(el=>el.addEventListener("click",()=>closeDialog(el.dataset.close)));
