@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0b1830">
+<title>Sign in · MEC Detail Banking</title>
+<link rel="icon" href="/mec-logo.webp">
+<link rel="stylesheet" href="/theme.css">
+<style>
+body{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 15% 10%,#1b365a 0,#0b1830 48%,#071225 100%);color:#172235}
+.login-card{width:min(430px,100%);background:#fff;border:1px solid rgba(230,210,168,.55);border-radius:20px;padding:32px;box-shadow:0 24px 90px rgba(0,0,0,.32)}
+.logo{width:100px;height:100px;display:block;object-fit:cover;border-radius:14px;margin:0 auto 18px}
+.brandname{text-align:center;color:#8c6a3b;font:700 10px var(--sans);letter-spacing:2px}
+h1{text-align:center;color:#0b1830;font:700 27px var(--serif);margin:8px 0}
+.sub{text-align:center;color:#758195;font-size:12px;line-height:1.6;margin:0 0 24px}
+label{display:block;font-size:11px;font-weight:700;color:#4d5a70;margin-bottom:7px}
+input{width:100%;height:46px;padding:0 13px;border:1px solid #dfe4eb;border-radius:9px;font:13px var(--sans);color:#172235;margin-bottom:12px;outline:none}
+input:focus{border-color:#c9a56a;box-shadow:0 0 0 3px rgba(201,165,106,.15)}
+button{width:100%;height:46px;border:0;border-radius:9px;background:linear-gradient(135deg,#d6b77d,#bd9659);color:#17243a;font-weight:700;font-size:12px;cursor:pointer;margin-top:8px}
+button:disabled{opacity:.55;cursor:wait}
+button.secondary{background:white;border:1px solid #e0e4ea;color:#536077}
+.msg{min-height:20px;margin:12px 0 0;text-align:center;color:#758195;font-size:11px;line-height:1.5}
+.msg.err{color:#b84e4e}
+.foot{text-align:center;border-top:1px solid #edf0f4;padding-top:16px;margin-top:22px;color:#9aa3b0;font-size:9px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main class="login-card">
+<img class="logo" src="/mec-logo.webp" alt="MEC official logo">
+<div class="brandname">MUGHAL ERA CREATION</div>
+<h1 id="title">MEC Finance Workspace</h1>
+<p class="sub" id="subtitle">Sign in with your email. We’ll send you a one-time verification code. No password needed.</p>
+
+<form id="loginForm">
+  <div id="emailPanel">
+    <label for="email">Email address</label>
+    <input id="email" type="email" autocomplete="username webauthn" autocapitalize="off" spellcheck="false" placeholder="you@example.com" required>
+  </div>
+  <div id="codePanel" hidden>
+    <label for="code">6-digit verification code</label>
+    <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="Enter code" pattern="[0-9]*">
+  </div>
+  <button id="continueBtn" type="submit">Continue securely</button>
+  <button id="backBtn" type="button" class="secondary" hidden>Use a different email</button>
+</form>
+
+<div id="passkeyPanel" hidden>
+  <p class="sub">Add a passkey to sign in next time with your fingerprint, face or device screen lock.</p>
+  <button id="addPasskey" type="button">Add a passkey</button>
+  <button id="skipPasskey" type="button" class="secondary">Not now</button>
+</div>
+
+<p id="message" class="msg" role="status" aria-live="polite"></p>
+<div class="foot">One Vision. Multi-Business. Global Success.<br>© MEC · Mughal Era Creation</div>
+</main>
+<script>
+(function(){
+  const A=window.hatchable&&window.hatchable.auth;
+  const $=id=>document.getElementById(id);
+  let step="email",hasPasskey=false;
+  const DECLINED="mec_passkey_offer_declined";
+  function say(s,err){$("message").textContent=s||"";$("message").className="msg"+(err?" err":"");}
+  function safeNext(){
+    const raw=new URLSearchParams(location.search).get("next")||"/";
+    if(!raw.startsWith("/")||raw.startsWith("//"))return "/";
+    for(let i=0;i<raw.length;i++){const c=raw.charCodeAt(i);if(c<32||c===92||c===127)return "/";}
+    return raw;
+  }
+  function done(){location.replace(safeNext());}
+  function decline(){try{localStorage.setItem(DECLINED,"1");}catch{}done();}
+  function showPasskeyOffer(){
+    if(hasPasskey||!A.supportsPasskeys||!A.supportsPasskeys()||localStorage.getItem(DECLINED)==="1"){done();return;}
+    step="passkey";$("loginForm").hidden=true;$("title").textContent="Secure this device";
+    $("subtitle").textContent="Your MEC sign-in is complete.";
+    $("passkeyPanel").hidden=false;
+    $("message").textContent="";
+  }
+  if(!A){say("Sign-in is unavailable. Refresh and try again.",true);$("continueBtn").disabled=true;return;}
+  A.getSession().then(s=>{if(s&&s.user)done();}).catch(()=>{});
+  if(A.attachPasskeyAutofill){
+    A.attachPasskeyAutofill($("email")).then(r=>{if(r&&r.user)done();}).catch(()=>{});
+  }
+  $("loginForm").addEventListener("submit",async e=>{
+    e.preventDefault();const btn=$("continueBtn");btn.disabled=true;say("");
+    try{
+      if(step==="email"){
+        const email=$("email").value.trim();if(!email)throw new Error("Enter your email address.");
+        const r=await A.startLogin({email});hasPasskey=!!(r&&r.has_passkey);
+        if(hasPasskey&&A.supportsPasskeys&&A.supportsPasskeys()){
+          try{const d=await A.signInWithPasskey({email});if(d&&d.user){done();return;}}catch{}
+        }
+        step="code";$("emailPanel").hidden=true;$("codePanel").hidden=false;
+        $("backBtn").hidden=false;btn.textContent="Verify and sign in";
+        $("subtitle").textContent="Enter the one-time code sent to "+email+".";
+        $("code").focus();say("Verification code sent. Check your inbox.");
+      }else if(step==="code"){
+        const d=await A.verifyCode({email:$("email").value.trim(),code:$("code").value.trim()});
+        if(!d||!d.user)throw new Error("The code could not be verified.");
+        showPasskeyOffer();
+      }
+    }catch(err){say(err.message||"Could not sign in. Please try again.",true);}
+    finally{btn.disabled=false;}
+  });
+  $("backBtn").addEventListener("click",()=>{
+    step="email";$("emailPanel").hidden=false;$("codePanel").hidden=true;$("backBtn").hidden=true;
+    $("continueBtn").textContent="Continue securely";$("subtitle").textContent="Sign in with your email. We’ll send you a one-time verification code. No password needed.";say("");
+  });
+  $("addPasskey").addEventListener("click",async()=>{
+    $("addPasskey").disabled=true;$("skipPasskey").disabled=true;
+    try{const saved=await A.registerPasskey();if(!saved)decline();else done();}
+    catch(err){say(err.message||"Could not add a passkey. You can continue without one.",true);$("addPasskey").disabled=false;$("skipPasskey").disabled=false;}
+  });
+  $("skipPasskey").addEventListener("click",decline);
+})();
+</script>
+</body>
+</html>
