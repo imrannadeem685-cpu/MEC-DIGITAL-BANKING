@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1830">
+  <meta name="description" content="MEC Detail Banking System — personal accounts, wallets and business cash flow records.">
+  <title>MEC Detail Banking System</title>
+  <link rel="icon" href="/mec-logo.webp" type="image/webp">
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div id="appLoading" class="loading-screen">
+    <img src="/mec-logo.webp" alt="MEC logo">
+    <div class="spinner"></div>
+    <p>Opening MEC Finance Workspace…</p>
+  </div>
+
+  <div id="pendingScreen" class="pending-screen" hidden>
+    <img src="/mec-logo.webp" alt="MEC logo">
+    <h1>Access awaiting approval</h1>
+    <p>Your account is registered, but the workspace owner has not approved it yet.</p>
+    <button class="btn btn-outline" id="pendingSignOut">Sign out</button>
+  </div>
+
+  <div id="appShell" class="app-shell" hidden>
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <img src="/mec-logo.webp" alt="MEC Mughal Era Creation">
+        <div><strong>MEC</strong><span>DETAIL BANKING</span></div>
+      </div>
+      <div class="workspace-label">FINANCE WORKSPACE</div>
+      <nav class="main-nav" aria-label="Main navigation">
+        <button class="nav-link active" data-page="dashboard"><span class="nav-icon">▦</span><span data-i18n="dashboard">Dashboard</span></button>
+        <button class="nav-link" data-page="transactions"><span class="nav-icon">⇄</span><span data-i18n="transactions">Transactions</span></button>
+        <button class="nav-link" data-page="documents"><span class="nav-icon">▤</span><span>Documents & Bills</span></button>
+        <button class="nav-link" data-page="accounts"><span class="nav-icon">▣</span><span data-i18n="accounts">Accounts & Wallets</span></button>
+        <button class="nav-link" data-page="businesses"><span class="nav-icon">▤</span><span data-i18n="businesses">Businesses</span></button>
+        <button class="nav-link" data-page="reports"><span class="nav-icon">◫</span><span data-i18n="reports">Reports</span></button>
+        <div class="nav-divider"></div>
+        <button class="nav-link role-owner" data-page="team"><span class="nav-icon">♙</span><span data-i18n="team">Team & Permissions</span></button>
+        <button class="nav-link role-owner" data-page="audit"><span class="nav-icon">◷</span><span data-i18n="audit">Activity Log</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="security-note"><span class="security-dot"></span><div><b>Private workspace</b><small>Records are access controlled</small></div></div>
+        <button class="profile-button" id="profileButton">
+          <span class="avatar" id="userAvatar">M</span>
+          <span class="profile-meta"><b id="userName">MEC Owner</b><small id="userRole">Owner</small></span>
+          <span class="profile-more">⋯</span>
+        </button>
+        <button class="sidebar-signout" id="signOut">Sign out</button>
+      </div>
+    </aside>
+
+    <div class="mobile-scrim" id="mobileScrim"></div>
+    <main class="main-area">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="mobile-menu" id="mobileMenu" aria-label="Open menu">☰</button>
+          <div><div class="eyebrow" id="pageEyebrow">MUGHAL ERA CREATION</div><h1 id="pageTitle">Dashboard</h1></div>
+        </div>
+        <div class="top-actions">
+          <span class="today-label" id="todayLabel"></span>
+          <button class="language-switch" id="languageSwitch" aria-label="Switch language">EN <span>·</span> اردو-رومن</button>
+          <button class="btn btn-gold btn-small" id="quickAdd">＋ <span data-i18n="addTransaction">Add transaction</span></button>
+        </div>
+      </header>
+
+      <div class="content-wrap">
+        <section class="page-view active" id="page-dashboard">
+          <div class="welcome-row">
+            <div><p class="section-kicker">FINANCIAL OVERVIEW</p><h2>Know where your money stands.</h2><p class="muted">A clear view of your accounts, activity and cash flow.</p></div>
+            <div class="range-chip"><span class="pulse-dot"></span> Live ledger · PKR</div>
+          </div>
+          <div class="stats-grid">
+            <article class="stat-card stat-primary"><div class="stat-head"><span>Total account balance</span><span class="stat-icon">◈</span></div><div class="stat-value" id="statBalance">Rs 0.00</div><div class="stat-foot">Across active bank accounts and wallets</div></article>
+            <article class="stat-card"><div class="stat-head"><span>This month · Income</span><span class="stat-icon green">↙</span></div><div class="stat-value" id="statIncome">Rs 0.00</div><div class="stat-foot" id="statIncomeCount">Money received</div></article>
+            <article class="stat-card"><div class="stat-head"><span>This month · Expenses</span><span class="stat-icon red">↗</span></div><div class="stat-value" id="statExpense">Rs 0.00</div><div class="stat-foot" id="statExpenseCount">Money sent</div></article>
+            <article class="stat-card"><div class="stat-head"><span>Net cash flow</span><span class="stat-icon gold">⌁</span></div><div class="stat-value" id="statNet">Rs 0.00</div><div class="stat-foot">All-time income minus expenses</div></article>
+          </div>
+          <div class="dashboard-grid">
+            <article class="panel chart-panel">
+              <div class="panel-heading"><div><h3>Cash flow trend</h3><p class="muted">Income vs expenses · last 6 months</p></div><span class="panel-pill">PKR</span></div>
+              <div class="chart-legend"><span><i class="legend-dot income-dot"></i> Income</span><span><i class="legend-dot expense-dot"></i> Expenses</span></div>
+              <div class="bar-chart" id="cashflowChart"><div class="empty-state small">Your monthly chart will appear after you record transactions.</div></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><h3>Workspace snapshot</h3><p class="muted">Your connected records</p></div></div>
+              <div class="snapshot-list"><div><span class="snap-icon">▣</span><div><b id="snapAccounts">0</b><small>Active accounts & wallets</small></div><button data-go="accounts" class="text-link">View</button></div><div><span class="snap-icon">▤</span><div><b id="snapBusinesses">0</b><small>Business profiles</small></div><button data-go="businesses" class="text-link">View</button></div><div><span class="snap-icon">⇄</span><div><b id="snapTransactions">0</b><small>Recorded transactions</small></div><button data-go="transactions" class="text-link">View</button></div></div>
+              <div class="privacy-callout"><span>✦</span><p><b>Proof attached. Record protected.</b><br>Upload transaction slips and keep them linked to each entry.</p></div>
+            </article>
+          </div>
+          <article class="panel recent-panel">
+            <div class="panel-heading"><div><h3>Recent transactions</h3><p class="muted">Latest entries across your workspace</p></div><button class="text-link" data-go="transactions">View all →</button></div>
+            <div id="recentTransactions" class="table-wrap"><div class="empty-state">No transactions yet. Add your first entry to start tracking cash flow.</div></div>
+          </article>
+        </section>
+
+        <section class="page-view" id="page-transactions">
+          <div class="page-heading-row"><div><p class="section-kicker">FINANCIAL RECORDS</p><h2>Transactions</h2><p class="muted">Every receipt, transfer and payment in one searchable ledger.</p></div><button class="btn btn-gold" id="addTransactionPage">＋ Add transaction</button></div>
+          <div class="filter-bar">
+            <div class="search-wrap"><span>⌕</span><input id="transactionSearch" type="search" placeholder="Search description, reference or person…"></div>
+            <select id="filterType" aria-label="Filter type"><option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option><option value="transfer">Transfer</option></select>
+            <select id="filterScope" aria-label="Filter scope"><option value="">All records</option><option value="personal">Personal</option><option value="business">Business</option></select>
+            <button class="btn btn-outline btn-small" id="refreshTransactions">↻ Refresh</button>
+            <button class="btn btn-outline btn-small" id="exportTransactions">↓ Export CSV</button>
+          </div>
+          <div class="panel table-panel"><div id="transactionsTable" class="table-wrap"><div class="empty-state">Loading transactions…</div></div></div>
+        </section>
+
+        <section class="page-view" id="page-documents">
+          <div class="page-heading-row"><div><p class="section-kicker">PRIVATE DOCUMENT VAULT</p><h2>Documents & bills</h2><p class="muted">Search saved payment slips, utility bills, invoices and receipts. Unpaid bills stay outside cash-flow totals.</p></div><button class="btn btn-outline" id="refreshDocuments">↻ Refresh</button></div>
+          <div class="filter-bar"><label class="full-field">Search documents <input id="documentSearch" type="search" placeholder="Search by party, bill number, reference or provider"></label></div>
+          <div class="panel table-panel"><div class="panel-heading"><div><h3>Saved documents</h3><p class="muted">Original proof files are stored privately.</p></div><span id="documentCount" class="scope-pill">0 records</span></div><div id="documentsTable" class="table-wrap"><div class="empty-state">No documents saved yet.</div></div></div>
+        </section>
+
+        <section class="page-view" id="page-accounts">
+          <div class="page-heading-row"><div><p class="section-kicker">YOUR MONEY SOURCES</p><h2>Accounts & wallets</h2><p class="muted">Manage balances for your bank accounts and digital wallets.</p></div><button class="btn btn-gold" id="addAccount">＋ Add account</button></div>
+          <div class="account-summary-strip" id="accountSummary"></div>
+          <div class="account-grid" id="accountsGrid"><div class="empty-state">No bank accounts or wallets added yet.</div></div>
+        </section>
+
+        <section class="page-view" id="page-businesses">
+          <div class="page-heading-row"><div><p class="section-kicker">BUSINESS CASH FLOW</p><h2>Businesses</h2><p class="muted">Separate the cash flow of each business while keeping one complete ledger.</p></div><button class="btn btn-gold" id="addBusiness">＋ Add business</button></div>
+          <div class="business-grid" id="businessGrid"><div class="empty-state">Add a business profile to start recording business cash flow.</div></div>
+        </section>
+
+        <section class="page-view" id="page-reports">
+          <div class="page-heading-row"><div><p class="section-kicker">INSIGHTS & CONTROL</p><h2>Reports</h2><p class="muted">Review income, expenses and category-level performance.</p></div><button class="btn btn-outline" id="reportExport">↓ Export transactions</button></div>
+          <div class="filter-bar report-filters"><label>From <input type="date" id="reportFrom"></label><label>To <input type="date" id="reportTo"></label><button class="btn btn-gold btn-small" id="runReport">Generate report</button></div>
+          <div class="stats-grid report-stats"><article class="stat-card"><div class="stat-head"><span>Total income</span><span class="stat-icon green">↙</span></div><div class="stat-value" id="reportIncome">Rs 0.00</div></article><article class="stat-card"><div class="stat-head"><span>Total expenses</span><span class="stat-icon red">↗</span></div><div class="stat-value" id="reportExpense">Rs 0.00</div></article><article class="stat-card"><div class="stat-head"><span>Net cash flow</span><span class="stat-icon gold">⌁</span></div><div class="stat-value" id="reportNet">Rs 0.00</div></article><article class="stat-card"><div class="stat-head"><span>Transactions</span><span class="stat-icon">⇄</span></div><div class="stat-value" id="reportCount">0</div></article></div>
+          <div class="reports-grid"><article class="panel"><div class="panel-heading"><div><h3>Category breakdown</h3><p class="muted">Grouped by transaction category</p></div></div><div id="categoryBreakdown" class="breakdown-list"><div class="empty-state small">Generate a report to see categories.</div></div></article><article class="panel"><div class="panel-heading"><div><h3>Monthly comparison</h3><p class="muted">Income and expenses</p></div></div><div class="bar-chart report-chart" id="reportChart"></div></article></div>
+        </section>
+
+        <section class="page-view" id="page-team">
+          <div class="page-heading-row"><div><p class="section-kicker">CONTROLLED ACCESS</p><h2>Team & permissions</h2><p class="muted">Invite staff and assign only the access they need.</p></div></div>
+          <div class="panel invite-panel"><div><h3>Invite a team member</h3><p class="muted">They will sign in with their email and one-time code.</p></div><form id="inviteForm" class="invite-form"><input type="email" id="inviteEmail" placeholder="Team member email" required><select id="inviteRole"><option value="accountant">Accountant</option><option value="cashier">Cashier</option><option value="staff">Staff</option><option value="viewer">Viewer</option></select><button class="btn btn-gold" type="submit">Add invitation</button></form></div>
+          <div class="panel table-panel"><div class="panel-heading"><div><h3>Workspace members</h3><p class="muted">Roles and access status</p></div></div><div id="teamTable" class="table-wrap"><div class="empty-state">Loading team…</div></div></div>
+          <p class="small-note">New accounts are not granted access automatically. The owner must invite and approve them first.</p>
+        </section>
+
+        <section class="page-view" id="page-audit">
+          <div class="page-heading-row"><div><p class="section-kicker">ACCOUNTABILITY</p><h2>Activity log</h2><p class="muted">Review important changes made in this workspace.</p></div></div>
+          <div class="panel table-panel"><div id="auditTable" class="table-wrap"><div class="empty-state">Loading activity…</div></div></div>
+        </section>
+      </div>
+      <footer class="app-footer"><span>© MEC · Mughal Era Creation</span><span>One Vision. Multi-Business. Global Success.</span></footer>
+    </main>
+  </div>
+
+  <dialog class="modal" id="transactionModal">
+    <form id="transactionForm" class="modal-card">
+      <div class="modal-head"><div><p class="section-kicker">LEDGER ENTRY</p><h2 id="transactionModalTitle">Add transaction</h2></div><button type="button" class="icon-close" data-close="transactionModal" aria-label="Close">×</button></div>
+      <input type="hidden" id="transactionId">
+      <div class="form-grid">
+        <label>Transaction type<select id="transactionType" required><option value="">Choose transaction direction</option><option value="income">Money received · Income</option><option value="expense">Money sent · Expense</option><option value="transfer">Account transfer</option></select></label>
+        <label>Record scope<select id="transactionScope" required><option value="personal">Personal</option><option value="business">Business</option></select></label>
+        <label class="full-field">Amount (PKR)<input id="transactionAmount" type="number" step="0.01" min="0.01" required placeholder="0.00"></label>
+        <label id="fromAccountWrap">Paid from<select id="transactionFrom"></select></label>
+        <label id="toAccountWrap">Received into<select id="transactionTo"></select></label>
+        <label id="businessWrap" class="full-field" hidden>Business<select id="transactionBusiness"></select></label>
+        <label>Category<select id="transactionCategory"><option>General</option><option>Sales</option><option>Purchase</option><option>Salary</option><option>Rent</option><option>Utilities</option><option>Transfer</option><option>Food</option><option>Transport</option><option>Personal</option><option>Other</option></select></label>
+        <label>Date<input id="transactionDate" type="date" required></label>
+        <label>Person / Counterparty<input id="transactionCounterparty" type="text" maxlength="120" placeholder="Sender, receiver or shop"></label>
+        <label>Transaction reference<input id="transactionReference" type="text" maxlength="120" placeholder="Bank / wallet reference ID"></label>
+        <label class="full-field">Description<textarea id="transactionDescription" rows="2" maxlength="1000" placeholder="Add a short note…"></textarea></label>
+        <div class="full-field proof-upload">
+          <label for="transactionProof">Bill / payment screenshot / bank slip <span class="optional-label">Optional</span></label>
+          <input id="transactionProof" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
+          <small>JPG, PNG, WebP or PDF · Max 5 MB · Original file stored privately. AI scan sends a copy to Google Gemini; check provider data terms before uploading sensitive banking documents.</small>
+          <div id="ocrStatus" class="ocr-status" role="status">Upload a bill or payment proof. The scanner will extract details and ask you to review before saving.</div>
+        </div>
+        <div class="full-field scan-review" id="scanReview" hidden>
+          <div class="scan-review-head"><div><strong>Smart scan results</strong><small id="scanSummary">Review every detected field before saving.</small></div><span class="scope-pill" id="scanDocumentType">Document</span></div>
+          <div id="scanWarnings" class="scan-warnings" role="status"></div>
+          <div class="form-grid scan-fields">
+            <label>Sender / payer<input id="scanSenderName" maxlength="160"></label>
+            <label>Sender account / mobile (masked)<input id="scanSenderAccount" maxlength="40"></label>
+            <label>Receiver / payee<input id="scanReceiverName" maxlength="160"></label>
+            <label>Receiver account / mobile (masked)<input id="scanReceiverAccount" maxlength="40"></label>
+            <label>Bank / wallet / biller<input id="scanProvider" maxlength="100"></label>
+            <label>Transaction time<input id="scanTime" type="text" placeholder="HH:MM"></label>
+            <label>Fee / service charges (PKR)<input id="scanFee" type="number" step="0.01" min="0"></label>
+            <label>Tax / GST (PKR)<input id="scanTax" type="number" step="0.01" min="0"></label>
+            <label>Bill number<input id="scanBillNumber" maxlength="120"></label>
+            <label>Invoice number<input id="scanInvoiceNumber" maxlength="120"></label>
+            <label>Consumer / customer reference<input id="scanConsumerReference" maxlength="120"></label>
+            <label>Due date<input id="scanDueDate" type="date"></label>
+            <label>Billing period<input id="scanBillingPeriod" maxlength="120"></label>
+            <label>Payment status<select id="scanPaymentStatus"><option value="unknown">Unknown / Review</option><option value="successful">Successful / Paid</option><option value="pending">Pending</option><option value="failed">Failed</option><option value="reversed">Reversed</option><option value="unpaid">Unpaid bill</option><option value="partial">Partially paid</option></select></label>
+            <label class="full-field">Merchant / counterparty<input id="scanBiller" maxlength="180"></label>
+          </div>
+          <section class="scan-report-section"><label for="scanReportText">Complete payment slip / bill details — automatic text report</label><textarea id="scanReportText" rows="14" spellcheck="false" placeholder="The complete scanned report will appear here automatically. You can correct it before saving."></textarea><small>Includes the detected payer, receiver, amounts, bank/wallet, reference, charges, bill details and the full readable text. Edit any correction before saving.</small></section>
+          <details class="scan-text-details"><summary>View original OCR transcription and line items</summary><pre id="scanFullText"></pre><pre id="scanLineItems"></pre></details>
+        </div>
+      </div>
+      <div class="modal-actions">
+            <button type="button" class="btn btn-outline" data-close="transactionModal">Cancel</button>
+            <button type="button" class="btn btn-outline" id="saveDocumentOnly">Save as document only</button>
+            <button type="submit" class="btn btn-gold" id="saveTransaction">Save transaction</button>
+          </div>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="accountModal">
+    <form id="accountForm" class="modal-card">
+      <div class="modal-head"><div><p class="section-kicker">MONEY SOURCE</p><h2>Add account or wallet</h2></div><button type="button" class="icon-close" data-close="accountModal">×</button></div>
+      <div class="form-grid">
+        <label>Account name<input id="accountName" required placeholder="e.g. Meezan Current"></label>
+        <label>Bank / wallet provider<input id="accountInstitution" placeholder="e.g. Meezan Bank, JazzCash"></label>
+        <label>Type<select id="accountType"><option value="bank">Bank account</option><option value="wallet">Mobile wallet</option></select></label>
+        <label>Usage scope<select id="accountScope"><option value="personal">Personal</option><option value="business">Business</option><option value="shared">Shared</option></select></label>
+        <label>Opening balance (PKR)<input id="accountOpening" type="number" step="0.01" value="0"></label>
+        <label>Opening date<input id="accountOpeningDate" type="date"></label>
+        <label>Account hint (last 4 digits)<input id="accountHint" maxlength="12" placeholder="Optional · never enter PIN"></label>
+        <label>Business<select id="accountBusiness"><option value="">Choose business if relevant</option></select></label>
+        <label class="full-field">Notes<textarea id="accountNotes" rows="2" placeholder="Optional notes"></textarea></label>
+      </div>
+      <div class="modal-actions"><button type="button" class="btn btn-outline" data-close="accountModal">Cancel</button><button class="btn btn-gold" type="submit">Save account</button></div>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="businessModal">
+    <form id="businessForm" class="modal-card">
+      <div class="modal-head"><div><p class="section-kicker">BUSINESS PROFILE</p><h2>Add business</h2></div><button type="button" class="icon-close" data-close="businessModal">×</button></div>
+      <label>Business name<input id="businessName" required placeholder="Enter business name"></label>
+      <label>Notes<textarea id="businessNotes" rows="3" placeholder="Optional details"></textarea></label>
+      <div class="modal-actions"><button type="button" class="btn btn-outline" data-close="businessModal">Cancel</button><button class="btn btn-gold" type="submit">Save business</button></div>
+    </form>
+  </dialog>
+
+  <dialog class="modal modal-narrow" id="voidModal">
+    <form id="voidForm" class="modal-card">
+      <div class="modal-head"><div><p class="section-kicker">AUDIT-SAFE ACTION</p><h2>Void transaction</h2></div><button type="button" class="icon-close" data-close="voidModal">×</button></div>
+      <input type="hidden" id="voidTransactionId">
+      <p class="muted">This keeps the original record and proof but excludes it from balances. Add a reason for the audit trail.</p>
+      <label>Reason<textarea id="voidReason" required rows="3" maxlength="500" placeholder="Why is this transaction incorrect?"></textarea></label>
+      <div class="modal-actions"><button type="button" class="btn btn-outline" data-close="voidModal">Cancel</button><button class="btn btn-danger" type="submit">Void transaction</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
