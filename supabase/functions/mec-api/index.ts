@@ -60,7 +60,7 @@ async function handler(req:Request){
  if(req.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
  if(!sbUrl||!anon||!service)return fail("Supabase backend secrets are not configured.",503);
  let ctx:any;try{ctx=await auth(req);}catch(e){const m=String((e as Error).message||e);return fail(m==="UNAUTHENTICATED"?"Please sign in again.":m==="PENDING_APPROVAL"?"Your access is pending owner approval.":m, m==="UNAUTHENTICATED"?401:m==="FORBIDDEN"||m==="PENDING_APPROVAL"?403:500);}
- const p=ctx.profile, ws=p.workspace_id, u=new URL(req.url), path=u.pathname.split("/").filter(Boolean).slice(1).join("/");
+ const p=ctx.profile, ws=p.workspace_id, u=new URL(req.url), path=u.pathname.includes("/mec-api/")?u.pathname.slice(u.pathname.indexOf("/mec-api/")+10):u.pathname.split("/").filter(Boolean).slice(-1)[0]||"";
  try{
   if(path==="bootstrap"&&req.method==="GET"){
    if(p.status!=="active")return json({profile:p,workspace:null});
