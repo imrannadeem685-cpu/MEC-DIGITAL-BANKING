@@ -26,4 +26,4 @@ This repository is source control, not a hosted application. The API handlers im
 - Review all permissions and access controls before inviting users or making any app public.
 
 ## Export note
-The source files were copied from the active Hatchable project. The platform-generated AGENTS.md file was intentionally excluded. The logo image is not included in this text-source export and must be transferred separately as a binary asset.
+The source files were copied from the active Hatchable project. The platform-generated AGENTS.md file was intentionally excluded. The optimized MEC finance emblem is included at `public/mec-logo.webp` and is referenced by the login and dashboard pages.
