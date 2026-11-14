@@ -3,6 +3,7 @@ name: Build and publish MEC Flutter suite
 on:
   push:
     branches:
+      - main
       - flutter-pages-deploy
     paths:
       - "flutter_suite/**"
