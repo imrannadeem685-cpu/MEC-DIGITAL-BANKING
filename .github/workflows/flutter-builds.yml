@@ -1,0 +1,53 @@
+name: MEC Banking Flutter Builds
+
+on:
+  push:
+    branches: [flutter-migration]
+    paths:
+      - 'flutter/**'
+      - '.github/workflows/flutter-builds.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: flutter-actions/setup-flutter@v4
+        with:
+          channel: stable
+          version: latest
+          cache: true
+          cache-sdk: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Generate Android and Web platform folders
+        working-directory: flutter
+        run: flutter create --platforms=android,web --project-name mec_detail_banking_flutter --org com.mecgroup .
+      - name: Install dependencies
+        working-directory: flutter
+        run: flutter pub get
+      - name: Analyze Dart code
+        working-directory: flutter
+        run: flutter analyze
+      - name: Run tests
+        working-directory: flutter
+        run: flutter test
+      - name: Build Web release
+        working-directory: flutter
+        run: flutter build web --release --base-href=/
+      - name: Build Android release APKs
+        working-directory: flutter
+        run: flutter build apk --release --split-per-abi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mec-detail-banking-web-and-android
+          if-no-files-found: error
+          path: |
+            flutter/build/web/
+            flutter/build/app/outputs/flutter-apk/*.apk
