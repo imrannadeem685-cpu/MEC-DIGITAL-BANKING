@@ -1,5 +1,3 @@
-library mec_flutter_core;
-
 import 'package:material_ui/material_ui.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
@@ -84,7 +82,7 @@ class ApiClient {
       return ApiSnapshot(
         statusCode: response.statusCode,
         summary: shortBody.length > 180
-            ? shortBody.substring(0, 180) + '…'
+            ? '${shortBody.substring(0, 180)}…'
             : shortBody,
       );
     } catch (error) {
@@ -189,7 +187,7 @@ class _ProjectHomePageState extends State<ProjectHomePage> {
                   style: const TextStyle(fontSize: 11)),
             ],
             const SizedBox(height: 8),
-            Text('Read-only connector: ' + feature.path,
+            Text('Read-only connector: ${feature.path}',
                 style: const TextStyle(color: Colors.black54, fontSize: 11)),
           ],
         ),
@@ -328,7 +326,7 @@ class _ProjectHomePageState extends State<ProjectHomePage> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(22),
                     gradient: LinearGradient(
-                      colors: [config.accent, config.accent.withOpacity(.82)],
+                      colors: [config.accent, config.accent.withValues(alpha: .82)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
