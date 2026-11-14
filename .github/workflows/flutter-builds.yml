@@ -28,7 +28,9 @@ jobs:
           java-version: '17'
       - name: Generate Android and Web platform folders
         working-directory: flutter
-        run: flutter create --platforms=android,web --project-name mec_detail_banking_flutter --org com.mecgroup .
+        run: |
+          flutter create --platforms=android,web --project-name mec_detail_banking_flutter --org com.mecgroup .
+          rm -f test/widget_test.dart
       - name: Install dependencies
         working-directory: flutter
         run: flutter pub get
